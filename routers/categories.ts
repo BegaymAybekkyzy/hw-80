@@ -1,6 +1,6 @@
 import express from "express";
 import mysqlDb from "../mysqlDb";
-import {ICategory} from "../types";
+import {ICategory, ICategoryMutation} from "../types";
 import {ResultSetHeader} from "mysql2";
 
 const categoryRouter = express.Router();
@@ -8,7 +8,7 @@ const categoryRouter = express.Router();
 categoryRouter.get("/", async (req, res) => {
     try {
         const connection = await mysqlDb.getConnection();
-        const [result] = await connection.query('SELECT * FROM categories');
+        const [result] = await connection.query('SELECT id, title FROM categories');
         const categories = result as ICategory[];
         res.send(categories);
 
@@ -30,33 +30,6 @@ categoryRouter.get("/:id", async (req, res) => {
     }
 });
 
-categoryRouter.put("/:id", async (req, res) => {
-    try {
-        const id = req.params.id;
-
-        if (!req.body.title) {
-            res.status(400).send({error: "Category title are missing"});
-            return;
-        }
-        const updateCategory: ICategory = {
-            title: req.body.title,
-            description: req.body.description,
-        };
-
-        const connection = await mysqlDb.getConnection();
-        await connection.query(
-            'UPDATE categories SET title = ?, description = ? WHERE id = ?',
-            [updateCategory.title, updateCategory.description, id])
-
-        const [oneCategory] = await connection.query('SELECT * FROM categories WHERE id = ?', [id]);
-        const category = oneCategory as ICategory[];
-        res.send(category[0]);
-
-    } catch (err) {
-        res.status(500).send(err);
-    }
-});
-
 categoryRouter.post('/', async (req, res) => {
     try {
         if (!req.body.title) {
@@ -64,7 +37,7 @@ categoryRouter.post('/', async (req, res) => {
             return;
         }
 
-        const newCategory: ICategory = {
+        const newCategory: ICategoryMutation = {
             title: req.body.title,
             description: req.body.description,
         };
@@ -76,6 +49,33 @@ categoryRouter.post('/', async (req, res) => {
 
         const resultHeader = result as ResultSetHeader;
         const id = resultHeader.insertId;
+
+        const [oneCategory] = await connection.query('SELECT * FROM categories WHERE id = ?', [id]);
+        const category = oneCategory as ICategory[];
+        res.send(category[0]);
+
+    } catch (err) {
+        res.status(500).send(err);
+    }
+});
+
+categoryRouter.put("/:id", async (req, res) => {
+    try {
+        const id = req.params.id;
+
+        if (!req.body.title || req.body.title.trim().length === 0) {
+            res.status(400).send({error: "Category title are missing"});
+            return;
+        }
+        const updateCategory: ICategoryMutation = {
+            title: req.body.title,
+            description: req.body.description,
+        };
+
+        const connection = await mysqlDb.getConnection();
+        await connection.query(
+            'UPDATE categories SET title = ?, description = ? WHERE id = ?',
+            [updateCategory.title, updateCategory.description, id])
 
         const [oneCategory] = await connection.query('SELECT * FROM categories WHERE id = ?', [id]);
         const category = oneCategory as ICategory[];
